@@ -29,6 +29,7 @@
 #include <QDialog>
 #include <QPushButton>
 #include <QTextEdit>
+#include <QScrollBar>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 	m_editor(new QPlainTextEdit(this)),
@@ -65,7 +66,6 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 	m_splitter->setStyleSheet(Theme::StyleSheets::getSplitterStyle());
 	m_splitter->setHandleWidth(2);
 	
-	// Подключение сигнала
 	connect(m_editor, &QPlainTextEdit::textChanged, this, [this]() {
 		m_isModified = true;
 		updateWindowTitle();
@@ -79,7 +79,7 @@ MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 	connect(m_executor.get(), &Executor::errorReceived, m_console, &ConsoleWidget::appendError);
 	connect(m_executor.get(), &Executor::inputRequested, this, &MainWindow::onInputRequested);
 	connect(m_executor.get(), &Executor::variablesUpdated, 
-        m_variablePanel, &VariablePanel::updateVariables);
+    m_variablePanel, &VariablePanel::updateVariables);
 	// Размеры
 	QSettings settings;
 	restoreGeometry(settings.value("geometry").toByteArray());
@@ -116,7 +116,7 @@ void MainWindow::setupUi()
   m_horizontalSplitter->addWidget(m_variablePanel);
   m_horizontalSplitter->setSizes({800, 300});
   m_horizontalSplitter->setChildrenCollapsible(false);
-	
+
 	setCentralWidget(m_horizontalSplitter);
   
   editorSplitter->setStyleSheet(Theme::StyleSheets::getSplitterStyle());

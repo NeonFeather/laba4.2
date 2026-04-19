@@ -41,7 +41,6 @@ void Executor::execute(const QString &code)
 		emit outputReceived(text);
 	});
 	
-	// Ввод через сигнал
 	evaluator.setInputCallback([this]() -> QString 
 	{
 		m_waitingForInput = true;

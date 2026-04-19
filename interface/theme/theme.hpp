@@ -18,6 +18,7 @@ namespace Theme
     inline const QColor StatusBarBackground = QColor(10, 12, 21); // rgba(11, 11, 11, 255) - #0B0B0B
     inline const QColor ToolbarBackground = QColor(10, 12, 21);   // rgba(11, 11, 11, 255) - #0B0B0B
     inline const QColor CurrentLineHighlight = QColor(26, 26, 26);
+    inline const QColor LineNumber = QColor(14, 16, 25);
     // Text colors
     inline const QColor TextPrimary = QColor(214, 222, 235);   // rgba(214, 222, 235, 255) - #D6DEEB
     inline const QColor TextSecondary = QColor(140, 157, 184); // rgba(140, 157, 184, 255) - #8C9DB8

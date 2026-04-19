@@ -184,9 +184,8 @@ void Parser::parseVarDeclarations(std::vector<std::unique_ptr<ASTNode>> &declara
 		
 		do 
 		{
-			if (peek().type == Lexer::TokenDelimiter && peek().value == ",") {
+			if (peek().type == Lexer::TokenDelimiter && peek().value == ",") 
 				advance();
-			}
 			decl->names.push_back(advance().value);
 		} while (peek().type == Lexer::TokenDelimiter && peek().value == ",");
 		
@@ -218,8 +217,8 @@ std::unique_ptr<ASTCompoundStatement> Parser::parseCompoundStatement()
 	while (!match(Lexer::TokenKeyword, "end")) 
 	{
 		compound->statements.push_back(parseStatement());
-		if (!match(Lexer::TokenDelimiter, ";")) {
-			// Точка с запятой может отсутствовать перед end
+		if (!match(Lexer::TokenDelimiter, ";")) 
+		{
 			if (peek().type == Lexer::TokenKeyword && peek().value.toLower() == "end") break;
 			expect(Lexer::TokenDelimiter, ";");
 		}
@@ -256,9 +255,8 @@ std::unique_ptr<ASTNode> Parser::parseIfStatement()
 	expect(Lexer::TokenKeyword, "then");
 	ifStmt->thenBranch = parseStatement();
 	
-	if (match(Lexer::TokenKeyword, "else")) {
+	if (match(Lexer::TokenKeyword, "else"))
 		ifStmt->elseBranch = parseStatement();
-	}
 	
 	return ifStmt;
 }
@@ -272,7 +270,8 @@ std::unique_ptr<ASTNode> Parser::parseWriteStatement()
 	
 	expect(Lexer::TokenDelimiter, "(");
 	
-	if (!match(Lexer::TokenDelimiter, ")")) {
+	if (!match(Lexer::TokenDelimiter, ")")) 
+	{
 		do 
 		{
 			if (peek().type == Lexer::TokenDelimiter && peek().value == ",") advance();
