@@ -1,0 +1,30 @@
+{
+    "configurations": [
+        {
+            "name": "macos-clang-arm64",
+            "includePath": [
+                "${workspaceFolder}/**",
+                "${workspaceFolder}/interface",
+                "${workspaceFolder}/core",
+                "/usr/local/include",
+                "/opt/homebrew/include",
+                "/opt/homebrew/opt/qt@6/include",
+                "/opt/homebrew/lib/QtCore.framework/Headers",
+                "/opt/homebrew/lib/QtWidgets.framework/Headers",
+                "/opt/homebrew/lib/QtGui.framework/Headers"
+            ],
+            "defines": [],
+            "macFrameworkPath": [
+                "/System/Library/Frameworks",
+                "/Library/Frameworks",
+                "/opt/homebrew/lib"
+            ],
+            "compilerPath": "/usr/bin/clang",
+            "cStandard": "c17",
+            "cppStandard": "c++17",
+            "intelliSenseMode": "macos-clang-arm64",
+            "configurationProvider": "ms-vscode.cmake-tools"
+        }
+    ],
+    "version": 4
+}
