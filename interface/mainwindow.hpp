@@ -34,6 +34,7 @@ private slots:
     bool saveFileAs();
     void executeCode();
     void stopExecution();
+    void showAST(); 
     
     // Обработчики состояния выполнения
     void onExecutionStarted();
@@ -48,6 +49,9 @@ private:
     void setupStatusBar();
     void updateWindowTitle();
     bool maybeSave();
+    void highlightError(int line, int column, const QString &message);
+    void clearErrorHighlight();
+    QString generateASTString(ASTNode *node, int indent = 0);
     
     // UI компоненты
     QPlainTextEdit *m_editor;
@@ -64,6 +68,7 @@ private:
     QAction *m_exitAction;
     QAction *m_runAction;
     QAction *m_stopAction;
+    
     
     // Состояние
     QString m_currentFile;

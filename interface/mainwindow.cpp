@@ -2,6 +2,7 @@
 #include "consolewidget.hpp"
 #include "core/executor.hpp"
 #include "theme/theme.hpp"
+#include "core/parser/parser.hpp"
 
 #include <QApplication>
 #include <QMenuBar>
@@ -20,6 +21,14 @@
 #include <QKeySequence>
 #include <QFontDatabase>
 #include <QInputDialog>
+#include <QFontMetrics>
+#include <QTimer>
+#include <QDebug>
+#include <QRegularExpression>
+#include <QVBoxLayout>
+#include <QDialog>
+#include <QPushButton>
+#include <QTextEdit>
 
 MainWindow::MainWindow(QWidget *parent) : QMainWindow(parent),
 	m_editor(new QPlainTextEdit(this)),
@@ -145,6 +154,8 @@ void MainWindow::setupMenuBar()
 	m_stopAction = runMenu->addAction("&Stop", Qt::Key_Escape, this, &MainWindow::stopExecution);
 	m_stopAction->setEnabled(false);
 	
+  QMenu *viewMenu = menuBar()->addMenu("&View");
+  viewMenu->addAction("Show &AST", this, &MainWindow::showAST);
 }
 
 void MainWindow::setupToolBar()
@@ -295,8 +306,27 @@ void MainWindow::executeCode()
 		m_console->appendWarning("Код для выполнения отсутствует.\n");
 		return;
 	}
-	
+
+	clearErrorHighlight();
 	m_console->clearConsole();
+
+  Parser testParser;
+    if (!testParser.parse(m_editor->toPlainText())) {
+        QString error = testParser.errorString();
+        m_console->appendError("Syntax error: " + error + "\n");
+        
+        // Пытаемся извлечь номер строки из ошибки
+        // Формат ошибки: "... at X:Y"
+        QRegularExpression re("at (\\d+):(\\d+)");
+        QRegularExpressionMatch match = re.match(error);
+        if (match.hasMatch()) {
+            int line = match.captured(1).toInt();
+            int column = match.captured(2).toInt();
+            highlightError(line, column, error);
+        }
+        return;
+    }
+
 	m_console->appendInfo("Код выполняется...\n");
 	m_console->appendInfo("----------------------------------------\n");
 	
@@ -340,5 +370,189 @@ void MainWindow::onInputRequested()
 	  "Enter value:", QLineEdit::Normal, "", &ok);
 	
 	if (ok) m_executor->provideInput(input);
-	else m_executor->provideInput("0");
+	else throw std::runtime_error("Input cancelled by user");
+}
+void MainWindow::highlightError(int line, int column, const QString &message)
+{
+  clearErrorHighlight();
+  
+  QTextCursor cursor(m_editor->document());
+  cursor.movePosition(QTextCursor::Start);
+  cursor.movePosition(QTextCursor::Down, QTextCursor::MoveAnchor, line - 1);
+  cursor.movePosition(QTextCursor::EndOfLine, QTextCursor::KeepAnchor);
+  
+  QTextCharFormat errorFormat;
+  errorFormat.setBackground(QColor(239, 83, 80, 100));  
+  errorFormat.setUnderlineColor(Theme::Colors::ConsoleError);
+  errorFormat.setUnderlineStyle(QTextCharFormat::WaveUnderline);
+  cursor.mergeCharFormat(errorFormat);
+  
+  m_statusLabel->setText("Error: " + message);
+}
+
+void MainWindow::clearErrorHighlight()
+{
+  QTextCursor cursor(m_editor->document());
+  cursor.select(QTextCursor::Document);
+  QTextCharFormat clearFormat;
+  clearFormat.setBackground(Qt::transparent);
+  clearFormat.setUnderlineStyle(QTextCharFormat::NoUnderline);
+  cursor.mergeCharFormat(clearFormat);
+}
+void MainWindow::showAST()
+{
+  QString code = m_editor->toPlainText();
+  if (code.trimmed().isEmpty()) {
+      m_console->appendWarning("No code to parse.\n");
+      return;
+  }
+  
+  Parser parser;
+  if (!parser.parse(code)) {
+      m_console->appendError("Cannot generate AST: " + parser.errorString() + "\n");
+      return;
+  }
+  
+  ASTProgram *program = parser.getAST();
+  if (!program) {
+      m_console->appendError("Failed to build AST\n");
+      return;
+  }
+  
+  // Генерируем текстовое представление AST
+  QString astText = generateASTString(program);
+  
+  // Показываем в отдельном диалоге
+  QDialog *dialog = new QDialog(this);
+  dialog->setWindowTitle("Abstract Syntax Tree");
+  dialog->resize(600, 400);
+  
+  QVBoxLayout *layout = new QVBoxLayout(dialog);
+  
+  QPlainTextEdit *textEdit = new QPlainTextEdit(dialog);
+  textEdit->setFont(Theme::Fonts::getConsoleFont());
+  textEdit->setPlainText(astText);
+  textEdit->setReadOnly(true);
+  
+  // Применяем тему
+  textEdit->setStyleSheet(Theme::StyleSheets::getConsoleStyle());
+  QPalette palette = textEdit->palette();
+  palette.setColor(QPalette::Base, Theme::Colors::EditorBackground);
+  palette.setColor(QPalette::Text, Theme::Colors::TextPrimary);
+  textEdit->setPalette(palette);
+  
+  QPushButton *closeBtn = new QPushButton("Close", dialog);
+  connect(closeBtn, &QPushButton::clicked, dialog, &QDialog::accept);
+  
+  layout->addWidget(textEdit);
+  layout->addWidget(closeBtn);
+  
+  dialog->exec();
+  delete dialog;
+}
+
+QString MainWindow::generateASTString(ASTNode *node, int indent)
+{
+  if (!node) return "";
+  
+  QString result;
+  QString prefix(indent * 2, ' ');
+  
+  switch (node->nodeType()) {
+  case ASTNodeType::Program: {
+    auto *prog = static_cast<ASTProgram*>(node);
+    result += prefix + "Program\n";
+    result += prefix + "├─ Declarations (" + QString::number(prog->declarations.size()) + ")\n";
+    for (auto &decl : prog->declarations) 
+      result += generateASTString(decl.get(), indent + 1);
+    result += prefix + "└─ Body\n";
+    result += generateASTString(prog->body.get(), indent + 1);
+    break;
+  }
+  case ASTNodeType::ConstDeclaration: {
+    auto *decl = static_cast<ASTConstDecl*>(node);
+    result += prefix + "├─ Const: " + decl->name + " = " + decl->value.toString() + "\n";
+    break;
+  }
+  case ASTNodeType::VarDeclaration: {
+    auto *decl = static_cast<ASTVarDecl*>(node);
+    QString names;
+    for (auto &name : decl->names) {
+      if (!names.isEmpty()) names += ", ";
+      names += name;
+    }
+    result += prefix + "├─ Var: " + names + " : " + 
+             (decl->type == DataType::Integer ? "integer" : 
+              decl->type == DataType::Double ? "double" : "other") + "\n";
+    break;
+  }
+  case ASTNodeType::CompoundStatement: {
+    auto *compound = static_cast<ASTCompoundStatement*>(node);
+    result += prefix + "├─ Begin\n";
+    for (auto &stmt : compound->statements) 
+      result += generateASTString(stmt.get(), indent + 1);
+    result += prefix + "└─ End\n";
+    break;
+  }
+  case ASTNodeType::Assignment: {
+    auto *assign = static_cast<ASTAssignment*>(node);
+    result += prefix + "├─ Assign: " + assign->name + " :=\n";
+    result += generateASTString(assign->expression.get(), indent + 1);
+    break;
+  }
+  case ASTNodeType::IfStatement: {
+    auto *ifStmt = static_cast<ASTIfStatement*>(node);
+    result += prefix + "├─ If\n";
+    result += prefix + "│  ├─ Condition\n";
+    result += generateASTString(ifStmt->condition.get(), indent + 2);
+    result += prefix + "│  ├─ Then\n";
+    result += generateASTString(ifStmt->thenBranch.get(), indent + 2);
+    if (ifStmt->elseBranch) {
+      result += prefix + "│  └─ Else\n";
+      result += generateASTString(ifStmt->elseBranch.get(), indent + 2);
+    }
+    break;
+  }
+  case ASTNodeType::WriteStatement: {
+    auto *write = static_cast<ASTWriteStatement*>(node);
+    result += prefix + "├─ Write" + QString(write->writeln ? "Ln" : "") + "\n";
+    for (auto &arg : write->arguments) 
+      result += generateASTString(arg.get(), indent + 1);
+    break;
+  }
+  case ASTNodeType::ReadStatement: {
+    auto *read = static_cast<ASTReadStatement*>(node);
+    result += prefix + "├─ Read: ";
+    for (auto &var : read->variables) 
+      result += var + " ";
+    result += "\n";
+    break;
+  }
+  case ASTNodeType::BinaryOp: {
+    auto *binOp = static_cast<ASTBinaryOp*>(node);
+    result += prefix + "├─ BinaryOp: " + binOp->op + "\n";
+    result += generateASTString(binOp->left.get(), indent + 1);
+    result += generateASTString(binOp->right.get(), indent + 1);
+    break;
+  }
+  case ASTNodeType::Identifier: {
+    auto *id = static_cast<ASTIdentifier*>(node);
+    result += prefix + "├─ ID: " + id->name + "\n";
+    break;
+  }
+  case ASTNodeType::NumberLiteral: {
+    auto *num = static_cast<ASTNumberLiteral*>(node);
+    result += prefix + "├─ Number: " + num->value.toString() + "\n";
+    break;
+  }
+  case ASTNodeType::StringLiteral: {
+    auto *str = static_cast<ASTStringLiteral*>(node);
+    result += prefix + "├─ String: \"" + str->value + "\"\n";
+    break;
+  }
+  default:
+    result += prefix + "├─ [Unknown node]\n";
+  }
+  
+  return result;
 }
